@@ -30,7 +30,7 @@ testing <- read.csv("pml-testing.csv",
 
 # Preprocessing
 
-The original dataset seems to contain time series data as well as summary data of that describe the data during a certain time window. These summary data are located in the rows that contain the new_window value "yes". However, these variables contain mostly NAs and are excluded from the model.
+The original dataset seems to contain time series data as well as summary data of that describe the data during a certain time window. These summary variables have values only in the rows that contain the new_window value "yes", and therefore, these variables contain mostly NAs and are excluded from the model.
 
 ```{r selecting variables}
 
@@ -45,6 +45,7 @@ training <-
          -starts_with("kurtosis"),
          -starts_with("amplitude"),
          -starts_with("stddev"))
+
 
 trainingClasse <- training$classe
 
@@ -93,14 +94,25 @@ ggplot(trainingPreProp %>% gather(variable, value),
 
 ```
 
-# Model selection using 2-fold crossvalidation to estimate out-of-sample error.
+# Model selection using k-fold crossvalidation to estimate out-of-sample error.
+
+I have started using 5-fold crossvalidation for the whole dataset. However, this takes a really long time. Therefore, I have decided to use subsets of the whole dataset to select a model and then use the whole dataset only for the final model.
+
+```{r subsetting for model selection}
+
+trainingFinal <- data.frame(classe = trainingClasse, trainingPreProp)
+
+sset <- createFolds(trainingFinal$classe, 10, list = F)
+trainingNew <- trainingFinal[sset == 1,]
+
+```
+
 
 ## Recursive Partitioning
 
 ```{r rpart}
 
-trainingNew <- data.frame(classe = trainingClasse, trainingPreProp)
-folds <- createFolds(trainingNew, 5, list = F)
+folds <- createFolds(trainingNew$classe, 5, list = F)
 
 acc <- c()
 for (i in 1:max(folds)) {
@@ -122,9 +134,11 @@ The estimated out-of-sample accuracy for the first model is `r mean(acc)`.
 
 ## Random Forest
 
+To speed up model selection, I have decided to reduce k to 3 for random forest and treebag.
+
 ```{r rf}
 
-folds <- createFolds(trainingNew, 2, list = F)
+folds <- createFolds(trainingNew$classe, 3, list = F)
 
 acc <- c()
 for (i in 1:max(folds)) {
@@ -148,7 +162,7 @@ The estimated out-of-sample accuracy for the first model is `r mean(acc)`.
 
 ```{r treebag}
 
-folds <- createFolds(trainingNew, 2, list = F)
+folds <- createFolds(trainingNew$classe, 3, list = F)
 
 acc <- c()
 for (i in 1:max(folds)) {
@@ -175,7 +189,7 @@ The random forest was the most accurate model, so we are going to use it to pred
 ```{r final model}
 
 finModel <-  train(classe ~ ., method = "rf",
-                   data = trainingNew)
+                   data = trainingFinal)
 
 print(data.frame(problem_id = testingID, predict(model, testingPreProp)))
 
